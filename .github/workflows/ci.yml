@@ -2,9 +2,9 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: ["develop"]
+    branches: ["main"]
   pull_request:
-    branches: ["develop"]
+    branches: ["main"]
 
 env:
   JACOCO_MIN_COVERAGE: "0.00"
@@ -24,11 +24,11 @@ jobs:
           distribution: "temurin"
           cache: "maven"
 
-      - name: Compile with Maven
-        run: mvn clean compile
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
 
-      - name: Run Tests and Verify Coverage
-        run: mvn test verify -Djacoco.minimum.coverage=${{ env.JACOCO_MIN_COVERAGE }}
+      - name: Build and Verify with Maven Wrapper
+        run: ./mvnw clean verify -Djacoco.minimum.coverage=${{ env.JACOCO_MIN_COVERAGE }}
 
       - name: Upload JaCoCo Coverage Report
         if: always()
