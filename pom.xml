@@ -110,6 +110,26 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>install-git-hooks</id>
+						<phase>initialize</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<copy file="${project.basedir}/githooks/pre-push" tofile="${project.basedir}/.git/hooks/pre-push" overwrite="true" failonerror="false"/>
+								<chmod file="${project.basedir}/.git/hooks/pre-push" perm="ugo+rx" failonerror="false"/>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 

@@ -1,0 +1,36 @@
+#!/bin/sh
+
+echo "======================================================"
+echo " [Git Hook] Iniciando validação pré-push..."
+echo "======================================================"
+
+REPO_DIR=$(git rev-parse --show-toplevel)
+cd "$REPO_DIR" || exit 1
+
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    echo " -> Docker detectado. Rodando compilação e testes no container 'eclipse-temurin:17-jdk'..."
+    docker run --rm -v "$REPO_DIR":/app -w /app eclipse-temurin:17-jdk ./mvnw clean test verify
+else
+    echo " -> Docker não detectado ou inativo. Tentando execução local do Maven..."
+    if [ -f "./mvnw" ]; then
+        ./mvnw clean test verify
+    else
+        mvn clean test verify
+    fi
+fi
+
+RESULT=$?
+
+if [ $RESULT -ne 0 ]; then
+    echo "======================================================"
+    echo " [Git Hook] FALHA: A compilação ou os testes falharam!"
+    echo " Push cancelado para proteger o ciclo de vida do código."
+    echo "======================================================"
+    exit 1
+fi
+
+echo "======================================================"
+echo " [Git Hook] SUCESSO: Todos os testes e validações passaram!"
+echo " Continuando com o push..."
+echo "======================================================"
+exit 0

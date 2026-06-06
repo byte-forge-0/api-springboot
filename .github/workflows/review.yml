@@ -1,0 +1,94 @@
+name: J.A.R.V.I.S. Review
+
+on:
+  pull_request:
+    branches: ["develop"]
+  issue_comment:
+    types: [created]
+
+jobs:
+  checkstyle-review:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request && contains(github.event.comment.body, '/jarvis review'))
+
+    name: J.A.R.V.I.S. PR Reviewer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout PR branch (Comment trigger)
+        if: github.event_name == 'issue_comment'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr checkout ${{ github.event.issue.number }}
+
+      - name: Create Mock PR Event Payload (Comment trigger)
+        if: github.event_name == 'issue_comment'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Obtém os detalhes do PR via API do GitHub
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          # Monta um JSON mínimo que simula o evento de pull_request
+          echo "{\"pull_request\": $PR_JSON, \"repository\": {\"owner\": {\"login\": \"${{ github.repository_owner }}\"}, \"name\": \"$(echo ${{ github.repository }} | cut -d'/' -f2)\"}}" > /tmp/mock_event.json
+
+      - name: Run Checkstyle with Reviewdog (PR trigger)
+        id: checkstyle_pr
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: dbelyaev/action-checkstyle@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          level: warning
+          fail_level: warning
+          filter_mode: added
+          tool_name: "J.A.R.V.I.S. Review"
+
+      - name: Run Checkstyle with Reviewdog (Comment trigger)
+        id: checkstyle_comment
+        if: github.event_name == 'issue_comment'
+        continue-on-error: true
+        uses: dbelyaev/action-checkstyle@v3
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_EVENT_PATH: /tmp/mock_event.json
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          level: warning
+          fail_level: warning
+          filter_mode: added
+          tool_name: "J.A.R.V.I.S. Review"
+
+      - name: J.A.R.V.I.S. Voice Response
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.issue.number || github.event.pull_request.number }}
+
+          # Determina se houve falha ou sucesso com base no gatilho que rodou
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            OUTCOME="${{ steps.checkstyle_pr.outcome }}"
+          else
+            OUTCOME="${{ steps.checkstyle_comment.outcome }}"
+          fi
+
+          if [ "$OUTCOME" = "failure" ]; then
+            MSG="Às suas ordens, senhor. Concluí a análise de estilo e encontrei algumas 'peculiaridades artísticas' nos seus commits recentes. Anotei as anomalias na aba **Files changed** para a sua atenção. Sugiro dar uma olhada, a menos que esteja tentando inaugurar um movimento pós-moderno de formatação de código."
+          elif [ "$OUTCOME" = "success" ]; then
+            MSG="Às suas ordens, senhor. A análise está completa e, para minha extrema surpresa, seu código está impecável e segue todos os padrões de estilo. Suponho que parabéns sejam devidos, embora eu estivesse secretamente esperando o desafio de corrigir seus deslizes. Excelente trabalho."
+          else
+            MSG="Mil perdões, senhor. Minhas sub-rotinas falharam miseravelmente ao analisar seu código. Presumo que a complexidade da sua lógica tenha sobrecarregado meus sistemas. Investigarei meus circuitos imediatamente."
+          fi
+
+          gh pr comment $PR_NUMBER --body "$MSG"
