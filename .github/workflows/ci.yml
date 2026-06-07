@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 env:
-  JACOCO_MIN_COVERAGE: "0.00"
+  JACOCO_MIN_COVERAGE: "0.70"
 
 jobs:
   build-and-test:
